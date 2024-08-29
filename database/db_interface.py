@@ -180,17 +180,18 @@ class DBInterface(BaseInterface):
     async def get_user_by_log_pas(self, login: str, password: str) -> Optional[UserAuth]:
         """Возвращает юзера. Пароль передается не хешированный"""
         async with self.async_ses() as session:
-            row = session.scalars(select(UserAuth).filter_by(username=login)).first()
-            if row is None:
-                return
-            if row.check_password(password=password):
-                return row
-        return
+            row = await session.execute(Query(UserAuth).filter_by(username=login))
+            # row = session.scalars(select(UserAuth).filter_by(username=login)).first()
+            if row:
+                row = row.scalar()
+                if row.check_password(password=password):
+                    return row
+            return
 
     async def get_user_bu_id(self, user_id: int) -> Optional[UserAuth]:
         async with self.async_ses() as session:
-            row = session.scalars(select(UserAuth).filter_by(id=user_id)).first()
-            return row
+            row = await session.execute(Query(UserAuth).filter_by(id=user_id))
+            return row.scalar()
 
     async def get_faq(self, search=None):
         if search:
@@ -219,6 +220,14 @@ class DBInterface(BaseInterface):
 async def main():
     db = DBInterface(DB_URL)
     await db.initial()
+    model = UserAuth(
+        username='admin',
+        name='admin'
+    )
+    model.set_password('admin')
+    async with db.async_ses() as session:
+        session.add(model)
+        await session.commit()
 #     data = [
 #     {
 #         "question": "Нужно ли мне есть только «продукты для диабетиков»?",
