@@ -11,7 +11,7 @@ admin_app = FastAPI(
 )
 admin_router = APIRouter()
 authentication_backend = AdminAuth(secret_key="123")
-admin = Admin(admin_app, engine=db.engine, session_maker=db.async_ses, authentication_backend=authentication_backend, base_url='/')
+admin = Admin(admin_app, engine=db.engine, session_maker=db.async_ses, authentication_backend=authentication_backend, base_url='/admin')
 admin.add_view(FAQView)
 
 # include_routes(app)

@@ -15,7 +15,7 @@ root_app.add_middleware(
     allow_headers=["*"],
 )
 
-root_app.mount('/', admin_app)
+root_app.mount('/admin', admin_app)
 root_app.mount('/api', api_app)
 api_app.include_router(api_router, tags=['Routes'])
 admin_app.include_router(admin_router, tags=['Routes'])

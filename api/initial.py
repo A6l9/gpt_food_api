@@ -8,6 +8,4 @@ api_app = FastAPI(
 )
 api_router = APIRouter()
 
-# admin.add_view(FAQView)
 
-# include_routes(app)
