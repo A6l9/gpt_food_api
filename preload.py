@@ -17,4 +17,4 @@ root_app.add_middleware(
 
 root_app.mount('/admin', admin_app)
 root_app.mount('/api', api_app)
-api_app.include_router(api_router, tags=['API'])
+api_app.include_router(api_router, tags=['Routes'])
