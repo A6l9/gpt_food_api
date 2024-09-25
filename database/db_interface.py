@@ -1,14 +1,10 @@
 import asyncio
-import pprint
-from collections import defaultdict
-from datetime import datetime
 from operator import or_
 from typing import Any, Iterable, Optional
 
-import asyncpg
-from sqlalchemy import Select, update, func, String, Integer, Boolean, literal_column, cast, case, desc, text, select
+from sqlalchemy import Select, update
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import Query, joinedload, aliased
+from sqlalchemy.orm import Query
 from sqlalchemy.sql.ddl import DropTable
 
 from config.config import DB_URL
@@ -115,6 +111,8 @@ class BaseInterface:
         и если такая строка есть в БД - возвращает ее.
         :param to_many: Флаг для возврата одного или нескольких значений
         :param model: Класс модели
+        :param order_by:
+        :param filter:
         :param kwargs: Поля и их значения
         :return:
         """
@@ -216,6 +214,7 @@ class DBInterface(BaseInterface):
                     in [*rows.scalars()]
                 ]
             return []
+
 
 async def main():
     db = DBInterface(DB_URL)

@@ -1,6 +1,6 @@
 import uvicorn
 
-from api.routes import get_faq
+from api.routes import get_faq, get_diaries
 from preload import *
 # from admin.routes import main_page
 
