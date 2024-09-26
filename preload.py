@@ -14,6 +14,7 @@ root_app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Authorization"]
 )
 
 root_app.mount('/admin', admin_app)
