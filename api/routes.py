@@ -8,11 +8,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from api.initial import api_router
-from api.models.request_models.models import DiaryRequest, ImageRequest
+from api.models.request_models.models import DiaryRequest, TextRequest
 from api.models.response_models.models import FAQResponse, DiaryResponse, TextResponse
 from api.tools.authentication import check_auth_hash, auth_process, check_widget_auth_hash, get_user_id_param
 from api.tools.check_enable_requests import check_enable_requests
 from api.tools.gpt import GPT, gpt_check_request
+from api.tools.formatters import reformat_date
 from database.initial import db, dbconf
 from database.models import User, FoodDiary, UserRequest
 
@@ -76,13 +77,20 @@ async def get_diaries(
 @api_router.post('/get_user_photo', response_model=TextResponse)
 async def get_user_photo(
         tg_user_id=get_user_id_param(),
-        image: UploadFile = File(...)
+        image: UploadFile=File(...),
+        write_diary: str=None   #TextRequest
 ):
     user = await db.get_user_by_tg_id(tg_id=str(tg_user_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
         raise HTTPException(status_code=403, detail='Error subscription ended.')
+    if write_diary:
+        if user.timezone is None:
+            response_data = {
+                'data': 'Чтобы вносить записи в дневник напишите вашу текущую дату и время в свободном формате'
+            }
+            return response_data
     image_bytes = await image.read()
     image_bufer = BytesIO(image_bytes)
     image_bufer.seek(0)
@@ -95,21 +103,39 @@ async def get_user_photo(
     logger.info(f'{gpt_promt=}')
     gpt = GPT(token=gpt_token, promt=gpt_promt)
     logger.info(f'{type(image_bytes)}')
-    try:
-        res = await gpt.request(image_bufer)
-    except HTTPException as exc:
-        logger.error(exc)
-    if gpt_check_request(res):
-        res = await gpt.request(image_bufer)
-    user_requests = await db.get_row(UserRequest, user_id=user.id)
-    if not (user_requests.subscribe_date_end and user_requests.subscribe_date_end > datetime.utcnow()):
-        if user_requests.usage_free_requests > 0:
-            await db.update_row(
-                UserRequest,
-                filter_by={'user_id': user.id},
-                usage_free_requests=user_requests.usage_free_requests - 1
-            )
-    response_data = {
-        'data': res
-    }
-    return response_data
+    if write_diary:
+        res = write_diary
+        try:
+            await gpt.sub_request(res, dbconf, user.id, reformat_date(datetime.utcnow(), user.timezone))
+            response_data = {
+                'data': 'Записано'
+            }
+            return response_data
+
+        except HTTPException as exc:
+            logger.error(exc)
+            response_data = {
+                'data': 'Ошибка записи'
+            }
+            return response_data
+    else:
+        try:
+            user_requests = await db.get_row(UserRequest, user_id=user.id)
+            for _ in range(3):
+                if not (user_requests.subscribe_date_end and user_requests.subscribe_date_end > datetime.utcnow()):
+                    res = await gpt.request(image_bufer)
+                    if any(word in res for word in
+                           ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
+                        if gpt_check_request(res):
+                            res = await gpt.request(image_bufer)
+                        response_data = {
+                            'data': res
+                        }
+                        return response_data
+            else:
+                response_data = {
+                    'data': None
+                }
+                return response_data
+        except HTTPException as exc:
+            logger.error(exc)

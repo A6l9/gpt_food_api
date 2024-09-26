@@ -96,9 +96,13 @@ def check_widget_auth_hash(auth_data):
 
 
 if __name__ == '__main__':
-    auth_data = {"query_id": "AAHgmhgQAAAAAOCaGBAVPMNf",
-                 "user": {"id": 270047968, "first_name": "Konstantin", "last_name": "", "username": "stansxnn",
-                          "language_code": "ru", "allows_write_to_pm": True}, "auth_date": "1724321379",
-                 "hash": "535056860168bbffb3a1f4754767e036fd6708c9b874eb532be661672fc58aae"}
+    auth_data = {
+    "id": 793160420,
+    "first_name": "Арина",
+    "last_name": "Ефимова",
+    "username": "arrra_efimova",
+    "auth_date": "1727350707",
+    "hash": "50a5ff84fdc2d47bb349c925334d7710a36c21b2209339f4ab69243e1417bfdd"
+}
     check_auth_hash(auth_data)
 
