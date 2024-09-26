@@ -27,3 +27,6 @@ class DiaryResponse(BaseModel):
         updated_at_without_time: str | None
     data: list[Item | None]
     list_all_dates: list[str | None]
+
+class TextResponse(BaseModel):
+    data: str | None

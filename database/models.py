@@ -1,8 +1,19 @@
+import datetime
+from enum import Enum
+from typing import Any
 
-from sqlalchemy import String, Integer, DateTime, Boolean, BigInteger
+from sqlalchemy import String, Integer, DateTime, Boolean, BigInteger, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from werkzeug.security import check_password_hash, generate_password_hash
 
+
+class TypeEnum(str, Enum):
+    FLOAT = 'float'
+    INTEGER = 'int'
+    STRING = 'str'
+    DATETIME = 'datetime'
+    BOOLEAN = 'bool'
+    TIME = 'time'
 
 class Base(DeclarativeBase):
     pass
@@ -53,6 +64,7 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(default=False)
     deleted: Mapped[bool] = mapped_column(default=False)
     timezone: Mapped[int] = mapped_column(nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime)
 
 
 class FoodDiary(Base):
@@ -116,3 +128,40 @@ class FoodDiary(Base):
             'updated_at': str(self.updated_at),
             'updated_at_without_time': str(self.updated_at.strftime('%d-%m-%Y'))
         }
+
+
+class UserRequest(Base):
+    __tablename__ = 'users_requests'
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer)
+    usage_free_requests: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    next_upd_free: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    subscribe_date_end: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+
+class Config(Base):
+    """Таблица с настрйоками бота"""
+    __tablename__ = "bot_settings"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    unique_name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    value: Mapped[str] = mapped_column(Text, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    type_: Mapped[TypeEnum] = mapped_column(String(16), nullable=True)
+    sub_data: Mapped[str] = mapped_column(String(64), nullable=True)
+
+    def get_value(self) -> Any:
+        if self.type_ == 'str':
+            return self.value
+        if self.type_ == 'int':
+            return int(self.value)
+        if self.type_ == 'float':
+            return float(self.value)
+        if self.type_ == 'datetime':
+            return datetime.strptime(self.value, self.sub_data)
+        if self.type_ == 'time':
+            return datetime.strptime(self.value, self.sub_data).time()
+        if self.type_ == 'bool':
+            return bool(self.value)
+        return None

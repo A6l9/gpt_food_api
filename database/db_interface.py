@@ -2,13 +2,13 @@ import asyncio
 from operator import or_
 from typing import Any, Iterable, Optional
 
-from sqlalchemy import Select, update
+from sqlalchemy import Select, update, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import Query
 from sqlalchemy.sql.ddl import DropTable
 
 from config.config import DB_URL
-from database.models import Base, UserAuth, FAQ
+from database.models import Base, UserAuth, FAQ, User, Config, TypeEnum
 from log_decor import *
 
 
@@ -191,6 +191,12 @@ class DBInterface(BaseInterface):
             row = await session.execute(Query(UserAuth).filter_by(id=user_id))
             return row.scalar()
 
+    async def get_user_by_tg_id(self, tg_id: str) -> Optional[User]:
+        async with self.async_ses() as session:
+            query = select(User).filter(User.tg_id == tg_id)
+            result = (await session.scalars(query)).first()
+        return result
+
     async def get_faq(self, search=None):
         if search:
             query = (
@@ -215,9 +221,21 @@ class DBInterface(BaseInterface):
                 ]
             return []
 
+class ConfigInterface(BaseInterface):
+
+    async def get_setting(self, unique_name: str) -> Optional[Config]:
+        """get_or_none Для поиска фраз по уникальному ключу. Возвращает сттроку, а не обьект таблицы"""
+        async with self.async_ses() as session:
+            row = await session.execute(Query(Config).filter_by(unique_name=unique_name))
+            res = row.scalar()
+            if res is None:
+                return None
+            return res
+
 
 async def main():
     db = DBInterface(DB_URL)
+    dbconf = ConfigInterface(DB_URL)
     await db.initial()
     model = UserAuth(
         username='admin',
@@ -269,8 +287,6 @@ async def main():
 #     async with db.async_ses() as session:
 #         session.add_all(models)
 #         await session.commit()
-
-
 
 
 if __name__ == '__main__':
