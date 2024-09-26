@@ -41,11 +41,11 @@ async def auth_router(
         check_widget_auth_hash(auth_data)
         logger.info('Success check hash')
         user = await db.get_or_create_user(
-            filter_by={'tg_user_id': str(auth_data['id'])},
-            last_name=auth_data.get('last_name'),
-            first_name=auth_data.get('first_name'),
-            tg_user_id=str(auth_data['id']),
-            tg_username=auth_data.get('username'),
+            filter_by={'tg_id': str(auth_data['id'])},
+            # last_name=auth_data.get('last_name'),
+            # first_name=auth_data.get('first_name'),
+            tg_id=str(auth_data['id']),
+            username=auth_data.get('username'),
         )
         return await auth_process(user.id, auth_data)
     raise HTTPException(status_code=403)
