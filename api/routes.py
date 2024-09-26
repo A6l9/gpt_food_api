@@ -34,7 +34,7 @@ async def auth_router(
     logger.info(f'{auth_data=}')
     if auth_data.get('user'):
         check_auth_hash(auth_data)
-        user_id = await db.get_row(User.id, tg_user_id=str(auth_data['user']['id']))
+        user_id = await db.get_row(User.id, tg_id=str(auth_data['user']['id']))
         if user_id:
             return await auth_process(user_id, auth_data)
     else:
