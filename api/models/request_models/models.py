@@ -6,4 +6,5 @@ class DiaryRequest(BaseModel):
     date: str | None = None
 
 class TextRequest(BaseModel):
-    write_diary: str | None = None
+    text: str | None = None
+    timezone: str | None = None

@@ -16,7 +16,7 @@ class AuthRequest(BaseModel):
 
     # @classmethod
     async def check_auth(self):
-        self.user_id = await db.get_row(User.id, tg_user_id=str(self.tg_user_id))
+        self.user_id = await db.get_row(User.id, tg_id=str(self.tg_user_id))
         if self.user_id:
             user_hash = await self.get_user_hash(self)
             if user_hash == self.session_id:

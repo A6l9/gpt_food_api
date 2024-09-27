@@ -1,5 +1,6 @@
 from datetime import datetime
 from io import BytesIO
+import asyncio
 
 from fastapi import HTTPException, UploadFile, File
 from fastapi.params import Query
@@ -14,6 +15,7 @@ from api.tools.authentication import check_auth_hash, auth_process, check_widget
 from api.tools.check_enable_requests import check_enable_requests
 from api.tools.gpt import GPT, gpt_check_request
 from api.tools.formatters import reformat_date
+from api.tools.task_storage import TaskStorage
 from database.initial import db, dbconf
 from database.models import User, FoodDiary, UserRequest
 
@@ -42,8 +44,6 @@ async def auth_router(
         logger.info('Success check hash')
         user = await db.get_or_create_user(
             filter_by={'tg_id': str(auth_data['id'])},
-            # last_name=auth_data.get('last_name'),
-            # first_name=auth_data.get('first_name'),
             tg_id=str(auth_data['id']),
             username=auth_data.get('username'),
         )
@@ -74,25 +74,26 @@ async def get_diaries(
         return response_data
 
 
-@api_router.post('/get_user_photo', response_model=TextResponse)
-async def get_user_photo(
-        tg_user_id=get_user_id_param(),
-        image: UploadFile=File(...),
-        write_diary: str=None   #TextRequest
+@api_router.post('/check_food', response_model=TextResponse)
+async def check_food_endpoint(
+        user_id=get_user_id_param(),
+        image: UploadFile=File(...)
 ):
-    user = await db.get_user_by_tg_id(tg_id=str(tg_user_id))
+    task_storage = TaskStorage.task_storage
+    image_bytes = await image.read()
+    task_storage[int(user_id)] = asyncio.create_task(check_food_func(user_id, image_bytes))
+    response_data = {
+        'data': user_id
+    }
+    return response_data
+
+async def check_food_func(user_id, image):
+    user = await db.get_row(User, id=int(user_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
         raise HTTPException(status_code=403, detail='Error subscription ended.')
-    if write_diary:
-        if user.timezone is None:
-            response_data = {
-                'data': 'Чтобы вносить записи в дневник напишите вашу текущую дату и время в свободном формате'
-            }
-            return response_data
-    image_bytes = await image.read()
-    image_bufer = BytesIO(image_bytes)
+    image_bufer = BytesIO(image)
     image_bufer.seek(0)
     try:
         gpt_token = (await dbconf.get_setting('gpt_token')).get_value()
@@ -102,40 +103,70 @@ async def get_user_photo(
     logger.info(f'{gpt_token=}')
     logger.info(f'{gpt_promt=}')
     gpt = GPT(token=gpt_token, promt=gpt_promt)
-    logger.info(f'{type(image_bytes)}')
-    if write_diary:
-        res = write_diary
-        try:
-            await gpt.sub_request(res, dbconf, user.id, reformat_date(datetime.utcnow(), user.timezone))
+    logger.info(f'{type(image)}')
+    try:
+        user_requests = await db.get_row(UserRequest, user_id=user.id)
+        for _ in range(3):
+            if user_requests.subscribe_date_end and user_requests.subscribe_date_end > datetime.utcnow():
+                res = await gpt.request(image_bufer)
+                if any(word in res for word in
+                       ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
+                    if gpt_check_request(res):
+                        res = await gpt.request(image_bufer)
+                    response_data = {
+                        'data': res
+                    }
+                    return response_data
+        else:
             response_data = {
-                'data': 'Записано'
+                'data': None
             }
             return response_data
+    except HTTPException as exc:
+        logger.error(exc)
 
-        except HTTPException as exc:
-            logger.error(exc)
-            response_data = {
-                'data': 'Ошибка записи'
-            }
-            return response_data
-    else:
-        try:
-            user_requests = await db.get_row(UserRequest, user_id=user.id)
-            for _ in range(3):
-                if not (user_requests.subscribe_date_end and user_requests.subscribe_date_end > datetime.utcnow()):
-                    res = await gpt.request(image_bufer)
-                    if any(word in res for word in
-                           ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
-                        if gpt_check_request(res):
-                            res = await gpt.request(image_bufer)
-                        response_data = {
-                            'data': res
-                        }
-                        return response_data
-            else:
-                response_data = {
-                    'data': None
-                }
-                return response_data
-        except HTTPException as exc:
-            logger.error(exc)
+
+@api_router.get('/check_ready', response_model=TextResponse)
+async def check_ready_or_not(
+        user_id=get_user_id_param()
+):
+    try:
+        task_storage = TaskStorage.task_storage
+        result = task_storage[int(user_id)].result()
+        response_data = {
+            'data': result.get('data')
+        }
+        return response_data
+    except:
+        response_data = {
+            'data': 'Еще не готово'
+        }
+        return response_data
+
+@api_router.post('/save_diary', response_model=TextResponse)
+async def save_diary(
+        user_id=get_user_id_param(),
+        request: TextRequest=None
+):
+    user = await db.get_row(User, id=int(user_id))
+    if user is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    if not await check_enable_requests(user, dbconf):
+        raise HTTPException(status_code=403, detail='Error subscription ended.')
+    if user.timezone is None:
+        db.update_timediff(user_id, request.timezone)
+    gpt_token = (await dbconf.get_setting('gpt_token')).get_value()
+    gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
+    gpt = GPT(token=gpt_token, promt=gpt_promt)
+    try:
+        await gpt.sub_request(request.text, db, user.id, reformat_date(datetime.utcnow(), user.timezone))
+        response_data = {
+            'data': 'Записано'
+        }
+        return response_data
+    except HTTPException as exc:
+        logger.error(exc)
+        response_data = {
+            'data': 'Ошибка записи'
+        }
+        return response_data

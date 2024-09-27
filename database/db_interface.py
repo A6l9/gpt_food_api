@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from operator import or_
 from typing import Any, Iterable, Optional
 
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Query
 from sqlalchemy.sql.ddl import DropTable
 
 from config.config import DB_URL
-from database.models import Base, UserAuth, FAQ, User, Config, TypeEnum
+from database.models import Base, UserAuth, FAQ, User, Config, TypeEnum, FoodDiary
 from log_decor import *
 
 
@@ -169,6 +170,13 @@ class BaseInterface:
                 print(f'failed update {model.__tablename__}')
                 # raise HTTPException(status_code=500, detail='Ошибка обновления')
 
+    async def update_timediff(self, user_id, timediff):
+        async with self.async_ses() as session:
+            await session.execute(
+                update(User).filter_by(id=user_id).values(timezone=timediff)
+            )
+            await session.commit()
+
 
 @loguru_decorate
 class DBInterface(BaseInterface):
@@ -220,6 +228,22 @@ class DBInterface(BaseInterface):
                     in [*rows.scalars()]
                 ]
             return []
+
+    async def add_user_diarys(self, user_id, date_create, diary_data):
+        model = FoodDiary(
+            user_id=user_id,
+            created_at=date_create,
+            updated_at=datetime.utcnow().replace(microsecond=0),
+            **diary_data
+        )
+        async with self.async_ses() as session:
+            session.add(model)
+            try:
+                await session.commit()
+                logger.info(f'Diary for user: {user_id} added')
+            except Exception as e:
+                logger.exception(f'Failed add Diary for user: {user_id}: {e}')
+
 
 class ConfigInterface(BaseInterface):
 
