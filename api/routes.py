@@ -141,6 +141,13 @@ async def check_food_func(user_id, image):
 
                     }
                     return response_data
+            else:
+                response_data = {
+                    'data': 'Закончилась подписка',
+                    'path_to_photo': None,
+                    'write_in_diary': False
+                }
+                return response_data
         else:
             response_data = {
                 'data': res,
@@ -165,6 +172,7 @@ async def check_ready_or_not(
             'write_in_diary': result.get('write_in_diary')
         }
         logger.debug('Ответ готов')
+        cur_task =  task_storage.pop(int(user_id))
         return response_data
     except InvalidStateError:
         response_data = {
