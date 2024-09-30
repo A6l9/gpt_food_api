@@ -11,7 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from api.initial import api_router
-from api.models.request_models.models import DiaryRequest, TextRequest
+from api.models.request_models.models import DiaryRequest, TextRequest, PhotoRequest
 from api.models.response_models.models import FAQResponse, DiaryResponse, TextResponse, TextResponseNoPhoto
 from api.tools.authentication import check_auth_hash, auth_process, check_widget_auth_hash, get_user_id_param
 from api.tools.check_enable_requests import check_enable_requests
@@ -78,7 +78,7 @@ async def get_diaries(
 
 @api_router.post('/check_food', response_model=TextResponseNoPhoto)
 async def check_food_endpoint(
-        image: str=Body(...),
+        image: str=PhotoRequest,
         user_id=get_user_id_param()
 ):
     byte_data = base64.b64decode(image)
