@@ -165,14 +165,17 @@ async def check_ready_or_not(
 ):
     try:
         task_storage = TaskStorage.task_storage
-        result = task_storage[int(user_id)].result()
+        result = {}
+        if task_storage.get(int(user_id)):
+            result = task_storage[int(user_id)].result()
         response_data = {
             'data': result.get('data'),
             'path_to_photo': result.get('path_to_photo'),
             'write_in_diary': result.get('write_in_diary')
         }
         logger.debug('Ответ готов')
-        cur_task =  task_storage.pop(int(user_id))
+        cur_task =  task_storage.pop(int(user_id), None)
+        logger.debug(task_storage)
         return response_data
     except InvalidStateError:
         response_data = {
@@ -194,12 +197,12 @@ async def save_diary(
     if not await check_enable_requests(user, dbconf):
         raise HTTPException(status_code=403, detail='Error subscription ended.')
     if user.timezone is None:
-        db.update_timediff(user_id, request.timezone)
+        await db.update_timediff(int(user_id), int(request.timezone))
     gpt_token = (await dbconf.get_setting('gpt_token')).get_value()
     gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
     gpt = GPT(token=gpt_token, promt=gpt_promt)
     try:
-        await gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), user.timezone)) #,path_to_photo=temp.path_to_photo
+        await gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), int(request.timezone))) #,path_to_photo=temp.path_to_photo
         response_data = {
             'data': 'Записано'
         }
