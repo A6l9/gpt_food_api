@@ -169,7 +169,7 @@ async def check_ready_or_not(
         if task_storage.get(int(user_id)):
             result = task_storage[int(user_id)].result()
         response_data = {
-            'data': result.get('data'),
+            'data': result.get('data', ''),
             'path_to_photo': result.get('path_to_photo'),
             'write_in_diary': result.get('write_in_diary')
         }
@@ -177,7 +177,7 @@ async def check_ready_or_not(
         cur_task =  task_storage.pop(int(user_id), None)
         logger.debug(task_storage)
         return response_data
-    except InvalidStateError:
+    except:
         response_data = {
             'data': '',
             'path_to_photo': None,
