@@ -229,11 +229,12 @@ class DBInterface(BaseInterface):
                 ]
             return []
 
-    async def add_user_diarys(self, user_id, date_create, diary_data):
+    async def add_user_diarys(self, user_id, date_create, diary_data, path_to_photo):
         model = FoodDiary(
             user_id=user_id,
             created_at=date_create,
             updated_at=datetime.utcnow().replace(microsecond=0),
+            path_to_photo=path_to_photo,
             **diary_data
         )
         async with self.async_ses() as session:

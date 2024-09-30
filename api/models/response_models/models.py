@@ -23,10 +23,18 @@ class DiaryResponse(BaseModel):
         fats_bje: str | None
         calories_bje: str | None
         bje_units: str | None
+        path_to_photo: str | None
         updated_at: str | None
         updated_at_without_time: str | None
     data: list[Item | None]
     list_all_dates: list[str | None]
 
+
 class TextResponse(BaseModel):
+    data: str | None
+    path_to_photo: str | None
+    write_in_diary: bool | None
+
+
+class TextResponseNoPhoto(BaseModel):
     data: str | None

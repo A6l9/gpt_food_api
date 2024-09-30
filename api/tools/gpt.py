@@ -97,7 +97,7 @@ class GPT:
                 response += choice.message.content
             return response
 
-    async def sub_request(self, message, db_con: db, user_id: int, user_date):
+    async def sub_request(self, message, db_con: db, user_id: int, user_date, path_to_photo: str):
 
         content = [
         {
@@ -176,7 +176,7 @@ class GPT:
                     logger.info("No JSON found in the response: " + response)
         if response_json:
             response_json = {key: str(val) if val is not None else val for key, val in response_json.items()}
-            await db_con.add_user_diarys(user_id, user_date, response_json)
+            await db_con.add_user_diarys(user_id, user_date, response_json, path_to_photo=path_to_photo)
             # return response
 
 def gpt_check_request(text: str) -> bool:
