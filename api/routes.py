@@ -118,7 +118,6 @@ async def check_food_func(user_id, image):
     logger.info(f'{type(image)}')
     try:
         user_requests = await db.get_row(UserRequest, user_id=user.id)
-        res = ''
         for _ in range(3):
             if (user_requests.subscribe_date_end
                     and user_requests.subscribe_date_end > datetime.datetime.utcnow()):
@@ -165,7 +164,7 @@ async def check_ready_or_not(
         return response_data
     except:
         response_data = {
-            'data': 'Еще не готово',
+            'data': '',
             'path_to_photo': None,
             'write_in_diary': None
         }
