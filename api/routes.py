@@ -117,11 +117,11 @@ async def check_food_func(user_id, image):
     gpt = GPT(token=gpt_token, promt=gpt_promt)
     logger.info(f'{type(image)}')
     try:
+        res = await gpt.request(image_bufer)
         user_requests = await db.get_row(UserRequest, user_id=user.id)
         for _ in range(3):
             if (user_requests.subscribe_date_end
                     and user_requests.subscribe_date_end > datetime.datetime.utcnow()):
-                res = await gpt.request(image_bufer)
                 if any(word in res for word in
                        ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
                     if gpt_check_request(res):
