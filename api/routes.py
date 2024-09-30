@@ -163,7 +163,7 @@ async def check_ready_or_not(
             'write_in_diary': result.get('write_in_diary')
         }
         return response_data
-    except State:
+    except:
         response_data = {
             'data': 'Еще не готово',
             'path_to_photo': None,
