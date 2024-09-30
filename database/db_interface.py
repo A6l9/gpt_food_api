@@ -229,7 +229,7 @@ class DBInterface(BaseInterface):
                 ]
             return []
 
-    async def add_user_diarys(self, user_id, date_create, diary_data, path_to_photo):
+    async def add_user_diarys(self, user_id, date_create, diary_data, path_to_photo=None):
         model = FoodDiary(
             user_id=user_id,
             created_at=date_create,

@@ -94,6 +94,7 @@ async def check_food_endpoint(
     return response_data
 
 async def check_food_func(user_id, image):
+    await db.initial()
     user = await db.get_row(User, id=int(user_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
@@ -132,9 +133,9 @@ async def check_food_func(user_id, image):
                         new_file.write(image)
                     dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
                     await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
-                                     text=res, recorded=False, datetime=datetime.datetime.utcnow())
+                                     text=res, recorded=False, datetime=datetime.datetime.utcnow().replace(microsecond=0))
                     response_data = {
-                        'data': res,
+                        'data': res.replace('\n', '<br />'),
                         'path_to_photo': dir_path,
                         'write_in_diary': True
 
@@ -179,7 +180,7 @@ async def save_diary(
         user_id=get_user_id_param()
 ):
     user = await db.get_row(User, id=int(user_id))
-    temp = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id))
+    # temp = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
@@ -190,8 +191,7 @@ async def save_diary(
     gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
     gpt = GPT(token=gpt_token, promt=gpt_promt)
     try:
-        await gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), user.timezone),
-                              path_to_photo=temp.path_to_photo)
+        await gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), user.timezone)) #,path_to_photo=temp.path_to_photo
         response_data = {
             'data': 'Записано'
         }

@@ -97,7 +97,7 @@ class GPT:
                 response += choice.message.content
             return response
 
-    async def sub_request(self, message, db_con: db, user_id: int, user_date, path_to_photo: str):
+    async def sub_request(self, message, db_con: db, user_id: int, user_date, path_to_photo: str=None):
 
         content = [
         {
