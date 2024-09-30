@@ -161,8 +161,11 @@ async def check_ready_or_not(
             'path_to_photo': result.get('path_to_photo'),
             'write_in_diary': result.get('write_in_diary')
         }
+        logger.debug('Ответ готов')
         return response_data
-    except:
+    except Exception as exc:
+        logger.exception(exc)
+        logger.debug('Ответ пока не готов')
         response_data = {
             'data': '',
             'path_to_photo': None,
