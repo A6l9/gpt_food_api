@@ -78,10 +78,10 @@ async def get_diaries(
 
 @api_router.post('/check_food', response_model=TextResponseNoPhoto)
 async def check_food_endpoint(
-        image: str=PhotoRequest,
+        image: PhotoRequest,
         user_id=get_user_id_param()
 ):
-    byte_data = base64.b64decode(image)
+    byte_data = base64.b64decode(image.image)
     task_storage = TaskStorage.task_storage
     task_storage[int(user_id)] = asyncio.create_task(check_food_func(user_id, byte_data))
     response_data = {
