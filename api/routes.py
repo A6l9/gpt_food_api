@@ -1,5 +1,6 @@
 import base64
 import datetime
+from asyncio import InvalidStateError
 from io import BytesIO
 import asyncio
 import os
@@ -19,7 +20,7 @@ from api.tools.gpt import GPT, gpt_check_request
 from api.tools.formatters import reformat_date
 from api.tools.task_storage import TaskStorage
 from database.initial import db, dbconf
-from database.models import User, FoodDiary, UserRequest, TemporaryPhotoStorage
+from database.models import User, FoodDiary, UserRequest, TemporaryHistoryStorage
 
 
 @api_router.get('/faq', response_model=FAQResponse)
@@ -83,6 +84,9 @@ async def check_food_endpoint(
 ):
     byte_data = base64.b64decode(image.image)
     task_storage = TaskStorage.task_storage
+    if task_storage.get(int(user_id)):
+        cur_task = task_storage[int(user_id)]
+        cur_task.cancel()
     task_storage[int(user_id)] = asyncio.create_task(check_food_func(user_id, byte_data))
     response_data = {
         'data': str(user_id)
@@ -90,9 +94,6 @@ async def check_food_endpoint(
     return response_data
 
 async def check_food_func(user_id, image):
-    temp_photo = await db.get_row(TemporaryPhotoStorage, user_id=int(user_id))
-    if temp_photo:
-        await db.delete_rows(TemporaryPhotoStorage, user_id=int(user_id))
     user = await db.get_row(User, id=int(user_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
@@ -130,7 +131,8 @@ async def check_food_func(user_id, image):
                     with open(f'{dir_path}/{time_now}.jpg', 'wb') as new_file:
                         new_file.write(image)
                     dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
-                    await db.add_row(TemporaryPhotoStorage, user_id=int(user_id), path_to_photo=dir_path)
+                    await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
+                                     text=res, recorded=False, datetime=datetime.datetime.utcnow())
                     response_data = {
                         'data': res,
                         'path_to_photo': dir_path,
@@ -149,7 +151,7 @@ async def check_food_func(user_id, image):
         logger.error(exc)
 
 
-@api_router.get('/check_ready', response_model=TextResponse)
+@api_router.post('/check_ready', response_model=TextResponse)
 async def check_ready_or_not(
         user_id=get_user_id_param()
 ):
@@ -163,9 +165,7 @@ async def check_ready_or_not(
         }
         logger.debug('Ответ готов')
         return response_data
-    except Exception as exc:
-        logger.exception(exc)
-        logger.debug('Ответ пока не готов')
+    except InvalidStateError:
         response_data = {
             'data': '',
             'path_to_photo': None,
@@ -179,7 +179,7 @@ async def save_diary(
         user_id=get_user_id_param()
 ):
     user = await db.get_row(User, id=int(user_id))
-    temp = await db.get_row(TemporaryPhotoStorage, user_id=int(user_id))
+    temp = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):

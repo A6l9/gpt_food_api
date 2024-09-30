@@ -168,8 +168,11 @@ class Config(Base):
             return bool(self.value)
         return None
 
-class TemporaryPhotoStorage(Base):
-    __tablename__ = 'temp_photo_storage'
+class TemporaryHistoryStorage(Base):
+    __tablename__ = 'temp_history_storage'
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(String)
     path_to_photo: Mapped[str] = mapped_column(String(255))
+    recorded: Mapped[bool] = mapped_column(Boolean)
+    datetime: Mapped[DateTime] = mapped_column(DateTime)
