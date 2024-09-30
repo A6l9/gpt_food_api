@@ -8,3 +8,6 @@ class DiaryRequest(BaseModel):
 class TextRequest(BaseModel):
     text: str | None = None
     timezone: str | None = None
+
+class PhotoRequest(BaseModel):
+    image: str | None = None
