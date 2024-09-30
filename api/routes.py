@@ -85,7 +85,7 @@ async def check_food_endpoint(
     task_storage = TaskStorage.task_storage
     task_storage[int(user_id)] = asyncio.create_task(check_food_func(user_id, byte_data))
     response_data = {
-        'data': user_id
+        'data': str(user_id)
     }
     return response_data
 
