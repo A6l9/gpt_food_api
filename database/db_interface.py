@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from sqlalchemy.sql.ddl import DropTable
 
 from config.config import DB_URL
-from database.models import Base, UserAuth, FAQ, User, Config, TypeEnum, FoodDiary
+from database.models import Base, UserAuth, FAQ, User, Config, TypeEnum, FoodDiary, TemporaryHistoryStorage
 from log_decor import *
 
 
@@ -177,6 +177,15 @@ class BaseInterface:
             )
             await session.commit()
 
+    async def update_status(self, his_id, status):
+        async with self.async_ses() as session:
+            try:
+                await session.execute(
+                    update(TemporaryHistoryStorage).filter_by(id=his_id).values(recorded=status)
+                )
+                await session.commit()
+            except Exception as exc:
+                logger.exception(exc)
 
 @loguru_decorate
 class DBInterface(BaseInterface):

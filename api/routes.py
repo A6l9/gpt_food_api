@@ -82,7 +82,17 @@ async def check_food_endpoint(
         image: PhotoRequest,
         user_id=get_user_id_param()
 ):
-    byte_data = base64.b64decode(image.image)
+    list_available_types = ['png', 'jpeg', 'gif', 'webp', 'jpg']
+    image_str = image.image.split(',')
+    if any(word in image_str[0] for word in
+           list_available_types):
+        image_str = image_str[1]
+    else:
+        response_data = {
+            'data': 'Невалидный формат изображения'
+        }
+        return response_data
+    byte_data = base64.b64decode(image_str)
     task_storage = TaskStorage.task_storage
     if task_storage.get(int(user_id)):
         cur_task = task_storage[int(user_id)]
@@ -226,5 +236,5 @@ async def save_diary(
     response_data = {
         'data': 'Записано'
     }
-    temp.recorded = True
+    await db.update_status(his_id=int(request.history_id), status=True)
     return response_data
