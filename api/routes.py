@@ -1,11 +1,10 @@
 import base64
 import datetime
-from asyncio import InvalidStateError
 from io import BytesIO
 import asyncio
 import os
 
-from fastapi import HTTPException, Body
+from fastapi import HTTPException
 from fastapi.params import Query
 from loguru import logger
 from starlette.requests import Request
@@ -94,8 +93,16 @@ async def check_food_endpoint(
     return response_data
 
 async def check_food_func(user_id, image):
-    await db.initial()
     user = await db.get_row(User, id=int(user_id))
+    user_requests = await db.get_row(UserRequest, user_id=user.id)
+    if not (user_requests.subscribe_date_end
+            and user_requests.subscribe_date_end > datetime.datetime.utcnow() or user.is_admin):
+        response_data = {
+            'data': 'Закончилась подписка',
+            'path_to_photo': None,
+            'write_in_diary': False
+        }
+        return response_data
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
@@ -117,35 +124,24 @@ async def check_food_func(user_id, image):
     logger.info(f'{gpt_token=}')
     logger.info(f'{gpt_promt=}')
     gpt = GPT(token=gpt_token, promt=gpt_promt)
-    logger.info(f'{type(image)}')
     try:
         res = await gpt.request(image_bufer)
-        user_requests = await db.get_row(UserRequest, user_id=user.id)
         for _ in range(3):
-            if (user_requests.subscribe_date_end
-                    and user_requests.subscribe_date_end > datetime.datetime.utcnow()):
-                if any(word in res for word in
-                       ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
-                    if gpt_check_request(res):
-                        res = await gpt.request(image_bufer)
-                    time_now = datetime.datetime.strftime(datetime.datetime.now(datetime.UTC), '%I:%M:%S')
-                    with open(f'{dir_path}/{time_now}.jpg', 'wb') as new_file:
-                        new_file.write(image)
-                    dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
-                    await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
-                                     text=res, recorded=False, datetime=datetime.datetime.utcnow().replace(microsecond=0))
-                    response_data = {
-                        'data': res.replace('\n', '<br />'),
-                        'path_to_photo': dir_path,
-                        'write_in_diary': True
-
-                    }
-                    return response_data
-            else:
+            if any(word in res for word in
+                   ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
+                if gpt_check_request(res):
+                    res = await gpt.request(image_bufer)
+                time_now = datetime.datetime.strftime(datetime.datetime.now(datetime.UTC), '%I:%M:%S')
+                with open(f'{dir_path}/{time_now}.jpg', 'wb') as new_file:
+                    new_file.write(image)
+                dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
+                await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
+                                 text=res, recorded=False, datetime=datetime.datetime.utcnow().replace(microsecond=0))
                 response_data = {
-                    'data': 'Закончилась подписка',
-                    'path_to_photo': None,
-                    'write_in_diary': False
+                    'data': res.replace('\n', '<br />'),
+                    'path_to_photo': dir_path,
+                    'write_in_diary': True
+
                 }
                 return response_data
         else:
@@ -167,15 +163,22 @@ async def check_ready_or_not(
         task_storage = TaskStorage.task_storage
         result = {}
         if task_storage.get(int(user_id)):
-            result = task_storage[int(user_id)].result()
+            if task_storage[int(user_id)].done():
+                result = task_storage[int(user_id)].result()
+                response_data = {
+                    'data': result.get('data', ''),
+                    'path_to_photo': result.get('path_to_photo'),
+                    'write_in_diary': result.get('write_in_diary')
+                }
+                logger.debug('Ответ готов')
+                cur_task = task_storage.pop(int(user_id), None)
+                logger.debug(task_storage)
+                return response_data
         response_data = {
-            'data': result.get('data', ''),
-            'path_to_photo': result.get('path_to_photo'),
-            'write_in_diary': result.get('write_in_diary')
+            'data': '',
+            'path_to_photo': None,
+            'write_in_diary': None
         }
-        logger.debug('Ответ готов')
-        cur_task =  task_storage.pop(int(user_id), None)
-        logger.debug(task_storage)
         return response_data
     except:
         response_data = {
