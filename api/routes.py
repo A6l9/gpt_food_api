@@ -58,7 +58,7 @@ async def auth_router(
 async def get_diaries(
         user_id=get_user_id_param(),
         request: DiaryRequest=None
-) -> dict:
+) -> JSONResponse:
     diaries_on_request = []
     list_all_dates = []
     if request.date:
@@ -74,7 +74,7 @@ async def get_diaries(
         'list_all_dates': list_all_dates,
     }
     if response_data:
-        return response_data
+        return JSONResponse(content=response_data, status_code=200)
 
 
 @api_router.post('/check_food', response_model=TextResponseNoPhoto)
@@ -91,7 +91,7 @@ async def check_food_endpoint(
         response_data = {
             'data': 'Невалидный формат изображения'
         }
-        return response_data
+        return JSONResponse(content=response_data, status_code=400),
     byte_data = base64.b64decode(image_str)
     task_storage = TaskStorage.task_storage
     if task_storage.get(int(user_id)):
@@ -101,7 +101,7 @@ async def check_food_endpoint(
     response_data = {
         'data': str(user_id)
     }
-    return response_data
+    return JSONResponse(content=response_data, status_code=200)
 
 
 async def check_food_func(user_id, image):
@@ -115,7 +115,7 @@ async def check_food_func(user_id, image):
             'write_in_diary': False,
             'history_id': None
         }
-        return response_data
+        return JSONResponse(content=response_data, status_code=400)
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
@@ -157,7 +157,7 @@ async def check_food_func(user_id, image):
                     'history_id': str(result.id)
 
                 }
-                return response_data
+                return JSONResponse(content=response_data, status_code=200)
         else:
             response_data = {
                 'data': res,
@@ -166,7 +166,7 @@ async def check_food_func(user_id, image):
                 'history_id': None
 
             }
-            return response_data
+            return JSONResponse(content=response_data, status_code=400)
 
 
     except HTTPException as exc:
@@ -193,7 +193,7 @@ async def check_ready_or_not(
                 cur_task = task_storage.pop(int(user_id), None)
                 logger.debug('Task has been deleted')
                 logger.debug(f'Task storage: {task_storage}')
-                return response_data
+                return JSONResponse(content=response_data, status_code=200)
         logger.debug('Task storage is empty')
         response_data = {
             'data': '',
@@ -201,7 +201,7 @@ async def check_ready_or_not(
             'write_in_diary': None,
             'history_id': None
         }
-        return response_data
+        return JSONResponse(content=response_data, status_code=400)
     except Exception as exc:
         logger.exception(f'Exception: {exc}')
         response_data = {
@@ -210,7 +210,7 @@ async def check_ready_or_not(
             'write_in_diary': None,
             'history_id': None
         }
-        return response_data
+        return JSONResponse(content=response_data, status_code=400)
 
 
 @api_router.post('/save_diary', response_model=TextResponseNoPhoto)
@@ -237,4 +237,19 @@ async def save_diary(
         'data': 'Записано'
     }
     await db.update_status(his_id=int(request.history_id), status=True)
-    return response_data
+    return JSONResponse(content=response_data, status_code=200)
+
+
+# @api_router.post('/get_history')
+# async def get_history(
+#         user_id=get_user_id_param()
+# ):
+#     user_history = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id), to_many=True)
+#     if not user_history:
+#         response_data = {
+#             'data': f'У пользователя {user_id} нет истории'
+#         }
+#         return response_data
+#     response_data = {
+#         'data': f'У пользователя {user_id} нет истории'
+#     }
