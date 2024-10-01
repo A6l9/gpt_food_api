@@ -115,7 +115,7 @@ async def check_food_func(user_id, image):
             'write_in_diary': False,
             'history_id': None
         }
-        return JSONResponse(content=response_data, status_code=400)
+        return response_data, 400
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
@@ -157,7 +157,7 @@ async def check_food_func(user_id, image):
                     'history_id': str(result.id)
 
                 }
-                return JSONResponse(content=response_data, status_code=200)
+                return response_data, 200
         else:
             response_data = {
                 'data': res,
@@ -166,7 +166,7 @@ async def check_food_func(user_id, image):
                 'history_id': None
 
             }
-            return JSONResponse(content=response_data, status_code=400)
+            return response_data, 400
 
 
     except HTTPException as exc:
@@ -182,7 +182,7 @@ async def check_ready_or_not(
         if task_storage.get(int(user_id)):
             if task_storage[int(user_id)].done():
                 logger.info('Task has been completed')
-                result = task_storage[int(user_id)].result()
+                result, status = task_storage[int(user_id)].result()
                 response_data = {
                     'data': result.get('data', ''),
                     'path_to_photo': result.get('path_to_photo'),
@@ -193,7 +193,7 @@ async def check_ready_or_not(
                 cur_task = task_storage.pop(int(user_id), None)
                 logger.debug('Task has been deleted')
                 logger.debug(f'Task storage: {task_storage}')
-                return JSONResponse(content=response_data, status_code=200)
+                return JSONResponse(content=response_data, status_code=status)
         logger.debug('Task storage is empty')
         response_data = {
             'data': '',
