@@ -7,7 +7,6 @@ import os
 from fastapi import HTTPException
 from fastapi.params import Query
 from loguru import logger
-from sqlalchemy.orm import class_mapper
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -64,9 +63,9 @@ async def get_diaries(
     if request.date:
         data_diary = await db.get_row(FoodDiary, user_id=int(user_id), to_many=True)
         diaries_on_request = [i.get_data()
-                   for i in data_diary if str(i.get_data().get('updated_at_without_time')) == request.date]
-        more_diaries = [i.get_data().get('updated_at_without_time')
-                   for i in data_diary if str(i.get_data().get('updated_at_without_time')) != request.date]
+                   for i in data_diary if str(i.get_data().get('created_at_without_time')) == request.date]
+        more_diaries = [i.get_data().get('created_at_without_time')
+                   for i in data_diary if str(i.get_data().get('created_at_without_time'))]
         if more_diaries:
             list_all_dates = list(dict.fromkeys(more_diaries))
     response_data = {
@@ -240,16 +239,19 @@ async def save_diary(
     return JSONResponse(content=response_data, status_code=200)
 
 
-# @api_router.post('/get_history')
-# async def get_history(
-#         user_id=get_user_id_param()
-# ):
-#     user_history = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id), to_many=True)
-#     if not user_history:
-#         response_data = {
-#             'data': f'У пользователя {user_id} нет истории'
-#         }
-#         return response_data
-#     response_data = {
-#         'data': f'У пользователя {user_id} нет истории'
-#     }
+@api_router.post('/get_history')
+async def get_history(
+        user_id=get_user_id_param()
+):
+    user_history = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id), to_many=True)
+    if not user_history:
+        response_data = {
+            'data': f'У пользователя {user_id} нет истории'
+        }
+        return JSONResponse(content=response_data, status_code=400)
+    list_to_send = [i.get_data() for i in user_history
+                    if i.datetime.strftime('%d-%m-%Y') == datetime.datetime.now().strftime('%d-%m-%Y')]
+    response_data = {
+        'data': list_to_send
+    }
+    return JSONResponse(content=response_data, status_code=200)

@@ -127,8 +127,8 @@ class FoodDiary(Base):
             'calories_bje': self.calories_bje,
             'bje_units': self.bje_units,
             'path_to_photo': self.path_to_photo,
-            'updated_at': str(self.updated_at),
-            'updated_at_without_time': str(self.updated_at.strftime('%d-%m-%Y'))
+            'created_at': str(self.created_at),
+            'created_at_without_time': str(self.created_at.strftime('%d-%m-%Y'))
         }
 
 
@@ -176,3 +176,11 @@ class TemporaryHistoryStorage(Base):
     path_to_photo: Mapped[str] = mapped_column(String(255))
     recorded: Mapped[bool] = mapped_column(Boolean)
     datetime: Mapped[DateTime] = mapped_column(DateTime)
+
+    def get_data(self):
+        return {
+            'text': self.text.replace('\n', '<br />'),
+            'path_to_photo': self.path_to_photo,
+            'recorded': self.recorded,
+            'datetime': str(self.datetime.strftime('%d-%m-%Y %H:%M'))
+        }
