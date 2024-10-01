@@ -205,15 +205,10 @@ async def save_diary(
     gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
     gpt = GPT(token=gpt_token, promt=gpt_promt)
     logger.debug('ПРОБЛЕМА!!!!!!!!')
-    try:
-        await gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), int(request.timezone))) #,path_to_photo=temp.path_to_photo
-        response_data = {
-            'data': 'Записано'
-        }
-        return response_data
-    except Exception as exc:
-        logger.exception(exc)
-        response_data = {
-            'data': 'Ошибка записи'
-        }
-        return response_data
+    asyncio.create_task(
+        gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), int(request.timezone))) #,path_to_photo=temp.path_to_photo
+    )
+    response_data = {
+        'data': 'Записано'
+    }
+    return response_data
