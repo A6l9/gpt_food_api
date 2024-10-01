@@ -7,6 +7,7 @@ import os
 from fastapi import HTTPException
 from fastapi.params import Query
 from loguru import logger
+from sqlalchemy.orm import class_mapper
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -92,6 +93,7 @@ async def check_food_endpoint(
     }
     return response_data
 
+
 async def check_food_func(user_id, image):
     user = await db.get_row(User, id=int(user_id))
     user_requests = await db.get_row(UserRequest, user_id=user.id)
@@ -100,7 +102,8 @@ async def check_food_func(user_id, image):
         response_data = {
             'data': 'Закончилась подписка',
             'path_to_photo': None,
-            'write_in_diary': False
+            'write_in_diary': False,
+            'history_id': None
         }
         return response_data
     if user is None:
@@ -111,8 +114,8 @@ async def check_food_func(user_id, image):
     dir_path = os.path.exists(f'./api/static/images/{date}')
     if not dir_path:
         os.mkdir(f'./api/static/images/{date}')
-        if not os.path.exists(f'./api/static/images/{date}/{user_id}'):
-            os.mkdir(f'./api/static/images/{date}/{user_id}')
+    if not os.path.exists(f'./api/static/images/{date}/{user_id}'):
+        os.mkdir(f'./api/static/images/{date}/{user_id}')
     dir_path = os.path.abspath(f'./api/static/images/{date}/{user_id}')
     image_bufer = BytesIO(image)
     image_bufer.seek(0)
@@ -135,12 +138,13 @@ async def check_food_func(user_id, image):
                 with open(f'{dir_path}/{time_now}.jpg', 'wb') as new_file:
                     new_file.write(image)
                 dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
-                await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
+                result = await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
                                  text=res, recorded=False, datetime=datetime.datetime.utcnow().replace(microsecond=0))
                 response_data = {
                     'data': res.replace('\n', '<br />'),
                     'path_to_photo': dir_path,
-                    'write_in_diary': True
+                    'write_in_diary': True,
+                    'history_id': str(result.id)
 
                 }
                 return response_data
@@ -148,9 +152,13 @@ async def check_food_func(user_id, image):
             response_data = {
                 'data': res,
                 'path_to_photo': None,
-                'write_in_diary': False
+                'write_in_diary': False,
+                'history_id': None
+
             }
             return response_data
+
+
     except HTTPException as exc:
         logger.error(exc)
 
@@ -161,32 +169,39 @@ async def check_ready_or_not(
 ):
     try:
         task_storage = TaskStorage.task_storage
-        result = {}
         if task_storage.get(int(user_id)):
             if task_storage[int(user_id)].done():
+                logger.info('Task has been completed')
                 result = task_storage[int(user_id)].result()
                 response_data = {
                     'data': result.get('data', ''),
                     'path_to_photo': result.get('path_to_photo'),
-                    'write_in_diary': result.get('write_in_diary')
+                    'write_in_diary': result.get('write_in_diary'),
+                    'history_id': result.get('history_id')
                 }
                 logger.debug('Ответ готов')
                 cur_task = task_storage.pop(int(user_id), None)
-                logger.debug(task_storage)
+                logger.debug('Task has been deleted')
+                logger.debug(f'Task storage: {task_storage}')
                 return response_data
+        logger.debug('Task storage is empty')
         response_data = {
             'data': '',
             'path_to_photo': None,
-            'write_in_diary': None
+            'write_in_diary': None,
+            'history_id': None
         }
         return response_data
-    except:
+    except Exception as exc:
+        logger.exception(f'Exception: {exc}')
         response_data = {
             'data': '',
             'path_to_photo': None,
-            'write_in_diary': None
+            'write_in_diary': None,
+            'history_id': None
         }
         return response_data
+
 
 @api_router.post('/save_diary', response_model=TextResponseNoPhoto)
 async def save_diary(
@@ -194,7 +209,7 @@ async def save_diary(
         user_id=get_user_id_param()
 ):
     user = await db.get_row(User, id=int(user_id))
-    # temp = await db.get_row(TemporaryHistoryStorage, user_id=int(user_id))
+    temp = await db.get_row(TemporaryHistoryStorage, id=int(request.history_id))
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
     if not await check_enable_requests(user, dbconf):
@@ -204,11 +219,12 @@ async def save_diary(
     gpt_token = (await dbconf.get_setting('gpt_token')).get_value()
     gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
     gpt = GPT(token=gpt_token, promt=gpt_promt)
-    logger.debug('ПРОБЛЕМА!!!!!!!!')
     asyncio.create_task(
-        gpt.sub_request(request.text, db, user.id, reformat_date(datetime.datetime.utcnow(), int(request.timezone))) #,path_to_photo=temp.path_to_photo
+        gpt.sub_request(temp.text, db, user.id,
+                        reformat_date(datetime.datetime.utcnow(), int(request.timezone)), path_to_photo=temp.path_to_photo)
     )
     response_data = {
         'data': 'Записано'
     }
+    temp.recorded = True
     return response_data

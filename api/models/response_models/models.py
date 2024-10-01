@@ -34,6 +34,7 @@ class TextResponse(BaseModel):
     data: str | None
     path_to_photo: str | None
     write_in_diary: bool | None
+    history_id: str | None
 
 
 class TextResponseNoPhoto(BaseModel):
