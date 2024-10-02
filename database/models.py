@@ -112,7 +112,7 @@ class FoodDiary(Base):
 
     def get_data(self):
         return {
-            'dish_id': self.id,
+            'dish_id': str(self.id),
             'dish_name': self.dish_name,
             'calories': self.calories,
             'proteins': self.proteins,
@@ -180,7 +180,7 @@ class TemporaryHistoryStorage(Base):
 
     def get_data(self):
         return {
-            'history_id': self.id,
+            'history_id': str(self.id),
             'text': self.text.replace('\n', '<br />'),
             'path_to_photo': self.path_to_photo,
             'recorded': self.recorded,
