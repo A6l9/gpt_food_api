@@ -172,7 +172,7 @@ async def check_food_func(user_id, image):
         logger.error(exc)
 
 
-@api_router.post('/check_ready', response_model=TextResponse)
+@api_router.get('/check_ready', response_model=TextResponse)
 async def check_ready_or_not(
         user_id=get_user_id_param()
 ):

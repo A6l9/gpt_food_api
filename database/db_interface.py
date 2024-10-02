@@ -1,9 +1,9 @@
 import asyncio
 from datetime import datetime
 from operator import or_
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, List
 
-from sqlalchemy import Select, update, select
+from sqlalchemy import Select, update, select, delete
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import Query
 from sqlalchemy.sql.ddl import DropTable
@@ -186,6 +186,17 @@ class BaseInterface:
                 await session.commit()
             except Exception as exc:
                 logger.exception(exc)
+
+    async def delete_old_records(self, lst_id: List):
+        async with self.async_ses() as session:
+            records = await session.execute(
+                delete(TemporaryHistoryStorage)
+                .filter(
+                    TemporaryHistoryStorage.id.in_(lst_id)
+                )
+            )
+            await session.commit()
+            logger.info('Delete old records')
 
 @loguru_decorate
 class DBInterface(BaseInterface):
