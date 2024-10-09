@@ -104,72 +104,75 @@ async def check_food_endpoint(
 
 
 async def check_food_func(user_id, image):
-    user = await db.get_row(User, id=int(user_id))
-    user_requests = await db.get_row(UserRequest, user_id=user.id)
-    if not (user_requests.subscribe_date_end
-            and user_requests.subscribe_date_end > datetime.datetime.utcnow() or user.is_admin):
-        response_data = {
-            'data': 'Закончилась подписка',
-            'path_to_photo': None,
-            'write_in_diary': False,
-            'history_id': None
-        }
-        return response_data, 400
-    if user is None:
-        raise HTTPException(status_code=404, detail='User not found')
-    if not await check_enable_requests(user, dbconf):
-        raise HTTPException(status_code=403, detail='Error subscription ended.')
-    date = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d")
-    dir_path = os.path.exists(f'./api/static/images/{date}')
-    if not dir_path:
-        os.mkdir(f'./api/static/images/{date}')
-    if not os.path.exists(f'./api/static/images/{date}/{user_id}'):
-        os.mkdir(f'./api/static/images/{date}/{user_id}')
-    dir_path = os.path.abspath(f'./api/static/images/{date}/{user_id}')
-    image_bufer = BytesIO(image)
-    image_bufer.seek(0)
     try:
-        gpt_token = (await dbconf.get_setting('gpt_token')).get_value()
-        gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
-    except Exception as e:
-        logger.error(e)
-    logger.info(f'{gpt_token=}')
-    logger.info(f'{gpt_promt=}')
-    gpt = GPT(token=gpt_token, promt=gpt_promt)
-    try:
-        res = await gpt.request(image_bufer)
-        for _ in range(3):
-            if any(word in res for word in
-                   ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
-                if gpt_check_request(res):
-                    res = await gpt.request(image_bufer)
-                time_now = datetime.datetime.strftime(datetime.datetime.now(datetime.UTC), '%I:%M:%S')
-                with open(f'{dir_path}/{time_now}.jpg', 'wb') as new_file:
-                    new_file.write(image)
-                dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
-                result = await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
-                                 text=res, recorded=False, datetime=datetime.datetime.utcnow().replace(microsecond=0))
-                response_data = {
-                    'data': res.replace('\n', '<br />'),
-                    'path_to_photo': dir_path,
-                    'write_in_diary': True,
-                    'history_id': str(result.id)
-
-                }
-                return response_data, 200
-        else:
+        user = await db.get_row(User, id=int(user_id))
+        user_requests = await db.get_row(UserRequest, user_id=user.id)
+        if not (user_requests.subscribe_date_end
+                and user_requests.subscribe_date_end > datetime.datetime.utcnow() or user.is_admin):
             response_data = {
-                'data': res,
+                'data': 'Закончилась подписка',
                 'path_to_photo': None,
                 'write_in_diary': False,
                 'history_id': None
-
             }
             return response_data, 400
+        if user is None:
+            raise HTTPException(status_code=404, detail='User not found')
+        if not await check_enable_requests(user, dbconf):
+            raise HTTPException(status_code=403, detail='Error subscription ended.')
+        date = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d")
+        dir_path = os.path.exists(f'./api/static/images/{date}')
+        if not dir_path:
+            os.mkdir(f'./api/static/images/{date}')
+        if not os.path.exists(f'./api/static/images/{date}/{user_id}'):
+            os.mkdir(f'./api/static/images/{date}/{user_id}')
+        dir_path = os.path.abspath(f'./api/static/images/{date}/{user_id}')
+        image_bufer = BytesIO(image)
+        image_bufer.seek(0)
+        try:
+            gpt_token = (await dbconf.get_setting('gpt_token')).get_value()
+            gpt_promt = (await dbconf.get_setting('gpt_promt')).get_value()
+        except Exception as e:
+            logger.exception(e)
+        logger.info(f'{gpt_token=}')
+        logger.info(f'{gpt_promt=}')
+        gpt = GPT(token=gpt_token, promt=gpt_promt)
+        try:
+            res = await gpt.request(image_bufer)
+            for _ in range(3):
+                if any(word in res for word in
+                       ['Калории', 'Белки', 'Жиры', 'Углеводы', 'Хлебные единицы', 'ХЕ', 'Протеин']):
+                    if gpt_check_request(res):
+                        res = await gpt.request(image_bufer)
+                    time_now = datetime.datetime.strftime(datetime.datetime.now(datetime.UTC), '%I:%M:%S')
+                    with open(f'{dir_path}/{time_now}.jpg', 'wb') as new_file:
+                        new_file.write(image)
+                    dir_path = f'/static/images/{date}/{user_id}/{time_now}.jpg'
+                    result = await db.add_row(TemporaryHistoryStorage, user_id=int(user_id), path_to_photo=dir_path,
+                                     text=res, recorded=False, datetime=datetime.datetime.utcnow().replace(microsecond=0))
+                    response_data = {
+                        'data': res.replace('\n', '<br />'),
+                        'path_to_photo': dir_path,
+                        'write_in_diary': True,
+                        'history_id': str(result.id)
+
+                    }
+                    return response_data, 200
+            else:
+                response_data = {
+                    'data': res,
+                    'path_to_photo': None,
+                    'write_in_diary': False,
+                    'history_id': None
+
+                }
+                return response_data, 400
 
 
-    except HTTPException as exc:
-        logger.error(exc)
+        except HTTPException as exc:
+            logger.error(exc)
+    except Exception as exc:
+        logger.exception(exc)
 
 
 @api_router.get('/check_ready', response_model=TextResponse)
